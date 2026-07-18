@@ -74,6 +74,36 @@ a { color: inherit; }
 .empty-state { text-align: center; padding: 50px 20px; color: var(--ink-soft); }
 .empty-state-title { font-family: var(--font-display); font-size: 20px; color: var(--ink); margin-bottom: 6px; }
 
+/* ---------- Module map: path overview of a level's modules (zigzag, SVG connectors) ---------- */
+.module-map { position: relative; margin-bottom: 26px; padding: 6px 0 2px; }
+.module-map-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.module-map-svg .is-open-link { stroke: var(--teal); }
+.module-map-svg .is-locked-link { stroke: var(--line); stroke-dasharray: 4 5; }
+.module-map-row { position: relative; z-index: 1; display: flex; margin-bottom: 22px; }
+.module-map-row:last-child { margin-bottom: 0; }
+.module-map-row.align-left { justify-content: flex-start; padding-left: 6%; }
+.module-map-row.align-right { justify-content: flex-end; padding-right: 6%; }
+.module-map-row.align-center { justify-content: center; }
+.module-map-node { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 112px; text-align: center; background: none; border: none; font: inherit; color: inherit; padding: 0; }
+.module-map-node:not(.is-locked) { cursor: pointer; }
+.module-map-node.is-locked { cursor: default; }
+.module-map-dot { position: relative; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-weight: 700; font-size: 14px; box-sizing: border-box; }
+.module-map-node.is-locked .module-map-dot { border: 2px dashed var(--line); color: var(--ink-soft); background: var(--card); opacity: 0.55; }
+.module-map-node.is-unlocked .module-map-dot { border: 2px solid var(--teal); color: var(--teal); background: var(--card); }
+.module-map-node.is-current .module-map-dot { border: 2px solid var(--teal); color: var(--teal); background: var(--teal-tint); }
+.module-map-node.is-done .module-map-dot { border: none; background: var(--gold); color: #fff; }
+.module-map-node.is-current .module-map-dot::after {
+  content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid var(--teal);
+  animation: module-map-pulse 1.8s ease-out infinite;
+}
+@keyframes module-map-pulse {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  70%, 100% { transform: scale(1.3); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .module-map-node.is-current .module-map-dot::after { animation: none; opacity: 0; } }
+.module-map-label { font-size: 12px; font-weight: 600; color: var(--ink-soft); max-width: 112px; }
+.module-map-node.is-done .module-map-label { color: var(--ink); }
+
 /* ---------- Lesson header / nav ---------- */
 .lesson-header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
 .back-btn { width: 38px; height: 38px; border-radius: 50%; background: var(--card); border: 1.5px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
@@ -211,7 +241,18 @@ a { color: inherit; }
 .touchpoint-box { background: var(--teal-tint); border-radius: var(--radius-m); padding: 14px 16px; color: var(--teal-dark); font-size: 13.5px; margin: 16px 0; }
 .completion-wrap { text-align: center; padding: 20px 20px 10px; }
 .completion-stamp { width: 100px; height: 100px; margin: 0 auto 16px; border-radius: 50%; border: 4px solid var(--gold); color: #8a5f10; background: var(--gold-tint); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 40px; transform: rotate(-8deg); }
+@keyframes stamp-in {
+  0% { opacity: 0; transform: translate(40px, -60px) rotate(45deg) scale(1.4); }
+  60% { opacity: 1; transform: translate(0, 0) rotate(-8deg) scale(1.08); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(-8deg) scale(1); }
+}
+.completion-stamp.is-stamping { animation: stamp-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@media (prefers-reduced-motion: reduce) { .completion-stamp.is-stamping { animation: none; } }
 .completion-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0 0 6px; }
+.undo-complete-link { margin-top: 14px; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); text-decoration: underline; padding: 6px; background: none; border: none; }
+
+.app-toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 12px); background: var(--ink); color: #fff; font-size: 13.5px; font-weight: 600; padding: 10px 18px; border-radius: 999px; box-shadow: var(--shadow-card); opacity: 0; pointer-events: none; z-index: 2000; transition: opacity 0.25s ease, transform 0.25s ease; }
+.app-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 480px) {
   .progress-percent { font-size: 28px; }
@@ -268,8 +309,10 @@ a { color: inherit; }
 /* ---------- Dashboard / 学习统计 (Part 1-3: reuses existing tokens/classes only) ---------- */
 .heatmap-grid { display: flex; gap: 3px; overflow-x: auto; padding: 4px 2px 10px; }
 .heatmap-week { display: flex; flex-direction: column; gap: 3px; }
-.heatmap-cell { width: 12px; height: 12px; border-radius: 3px; background: var(--line); }
+.heatmap-cell { width: 12px; height: 12px; border-radius: 3px; background: var(--line); box-sizing: border-box; }
 .heatmap-cell.is-future { visibility: hidden; }
+/* Days with a learning record read as a tiny wax-seal stamp (round + gold ring, like .completion-stamp); empty days stay a plain square. */
+.heatmap-cell:not(.level-0) { border-radius: 50%; border: 1.5px solid var(--gold); }
 .heatmap-cell.level-1 { background: var(--teal-tint); }
 .heatmap-cell.level-2 { background: color-mix(in srgb, var(--teal-tint) 35%, var(--teal) 65%); }
 .heatmap-cell.level-3 { background: var(--teal); }
@@ -287,6 +330,13 @@ a { color: inherit; }
 .achievement-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .achievement-badge { background: var(--card); border-radius: var(--radius-m); box-shadow: var(--shadow-card); padding: 14px; text-align: center; }
 .achievement-badge.is-locked { opacity: 0.45; }
+@keyframes badge-unlock-pop {
+  0% { transform: scale(1); box-shadow: var(--shadow-card); }
+  40% { transform: scale(1.15); box-shadow: 0 0 0 10px color-mix(in srgb, var(--gold) 45%, transparent), var(--shadow-card); }
+  100% { transform: scale(1); box-shadow: var(--shadow-card); }
+}
+.achievement-badge.is-newly-unlocked { animation: badge-unlock-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@media (prefers-reduced-motion: reduce) { .achievement-badge.is-newly-unlocked { animation: none; } }
 .achievement-badge-icon { font-size: 26px; margin-bottom: 6px; }
 .achievement-badge-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 .achievement-badge-progress { font-size: 11.5px; color: var(--ink-soft); }
@@ -496,6 +546,7 @@ a { color: inherit; }
         <div class="completion-stamp">✓</div>
         <h2 class="completion-title">¡Muy bien!</h2>
         <button class="nav-btn primary" id="complete-btn" style="width:100%;">标记完成 · Mark as Complete</button>
+        <button id="undo-complete-link" class="undo-complete-link" style="display:none;">撤销这次完成</button>
       </div>
     </section>
 
@@ -609,6 +660,7 @@ a { color: inherit; }
   </div>
 </div>
 
+<div id="app-toast" class="app-toast" role="status" aria-live="polite"></div>
 
 <script>
 /* ============================================================
@@ -6164,6 +6216,31 @@ function recordLessonCompletionForToday(lessonId) {
   saveCompletionLog(log);
 }
 
+/* ---------- Undo a lesson completion (mistaken taps) ----------
+   Reverses exactly what markLessonComplete()/initReviewItemsForLesson() did for
+   this one lessonId: unmark it, drop its review cards, drop its completion-log
+   entries. Deliberately leaves andale_review_streak_v1 alone — it's an aggregate
+   across every lesson/review action, and rolling it back for a single undo would
+   need to know what the streak would have been without this lesson, which isn't
+   recoverable from the stored data. */
+function undoLessonComplete(lessonId) {
+  const p = getProgress();
+  p.completedLessons = p.completedLessons.filter(id => id !== lessonId);
+  saveProgress(p);
+
+  const state = getReviewState();
+  Object.keys(state)
+    .filter(id => id.startsWith(lessonId + "::"))
+    .forEach(id => delete state[id]);
+  saveReviewState(state);
+
+  const log = getCompletionLog();
+  Object.keys(log).forEach(date => {
+    log[date] = log[date].filter(id => id !== lessonId);
+  });
+  saveCompletionLog(log);
+}
+
 function getOverallStats() {
   const all = getAllLessonsFlat();
   const p = getProgress();
@@ -6363,8 +6440,11 @@ function renderModulePath() {
 
   const allLessonsFlat = level.modules.flatMap(m => m.lessonIds).map(id => LESSONS[id]).filter(Boolean);
 
+  renderModuleMap(level, p, container);
+
   level.modules.forEach(mod => {
     const modWrap = document.createElement("div");
+    modWrap.id = `module-block-${mod.id}`;
     modWrap.className = "module-block";
 
     const modHeader = document.createElement("div");
@@ -6425,6 +6505,94 @@ function renderModulePath() {
 
     modWrap.appendChild(camino);
     container.appendChild(modWrap);
+  });
+}
+
+/* ---------- Module map: path overview of the level's modules ----------
+   Purely presentational — reuses the same completedLessons data renderModulePath
+   already reads. A module counts as "locked" only if the previous module isn't
+   fully done yet; this mirrors the lesson-level notYetReached check above, just
+   at module granularity. Clicking a node scrolls to that module's existing
+   lesson-camino block (module-block-<id>) rather than introducing new navigation. */
+function renderModuleMap(level, p, pathContainer) {
+  const wrap = document.createElement("div");
+  wrap.className = "module-map";
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "module-map-svg");
+  wrap.appendChild(svg);
+
+  const alignments = ["center", "left", "right"];
+  const nodeMeta = [];
+  let currentAssigned = false;
+
+  level.modules.forEach((mod, idx) => {
+    const lessons = mod.lessonIds.map(id => LESSONS[id]).filter(Boolean);
+    const done = lessons.length > 0 && lessons.every(l => p.completedLessons.includes(l.id));
+    const prevMod = idx > 0 ? level.modules[idx - 1] : null;
+    const prevDone = !prevMod || prevMod.lessonIds.every(id => p.completedLessons.includes(id));
+    const locked = !done && !prevDone;
+    const isCurrent = !done && !locked && !currentAssigned;
+    if (isCurrent) currentAssigned = true;
+    const state = done ? "is-done" : locked ? "is-locked" : isCurrent ? "is-current" : "is-unlocked";
+
+    const row = document.createElement("div");
+    row.className = `module-map-row align-${alignments[idx % alignments.length]}`;
+
+    const node = document.createElement("button");
+    node.type = "button";
+    node.className = `module-map-node ${state}`;
+    node.disabled = locked;
+    node.setAttribute("aria-label", `${mod.id} ${mod.nameZh}`);
+
+    const dot = document.createElement("div");
+    dot.className = "module-map-dot";
+    dot.textContent = done ? "✓" : mod.id;
+    node.appendChild(dot);
+
+    const label = document.createElement("div");
+    label.className = "module-map-label";
+    label.textContent = mod.nameZh;
+    node.appendChild(label);
+
+    if (!locked) {
+      node.addEventListener("click", () => {
+        const target = document.getElementById(`module-block-${mod.id}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    row.appendChild(node);
+    wrap.appendChild(row);
+    nodeMeta.push({ dot, locked });
+  });
+
+  pathContainer.appendChild(wrap);
+
+  // Connector lines need the nodes' actual laid-out positions, so draw them
+  // one frame after the flex rows above have been placed.
+  requestAnimationFrame(() => {
+    const wrapRect = wrap.getBoundingClientRect();
+    svg.setAttribute("width", wrapRect.width);
+    svg.setAttribute("height", wrapRect.height);
+    svg.setAttribute("viewBox", `0 0 ${wrapRect.width} ${wrapRect.height}`);
+
+    const centers = nodeMeta.map(({ dot }) => {
+      const r = dot.getBoundingClientRect();
+      return { x: r.left + r.width / 2 - wrapRect.left, y: r.top + r.height / 2 - wrapRect.top };
+    });
+
+    for (let i = 0; i < centers.length - 1; i++) {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", centers[i].x);
+      line.setAttribute("y1", centers[i].y);
+      line.setAttribute("x2", centers[i + 1].x);
+      line.setAttribute("y2", centers[i + 1].y);
+      line.setAttribute("stroke-width", "2.5");
+      line.setAttribute("stroke-linecap", "round");
+      line.setAttribute("class", nodeMeta[i + 1].locked ? "is-locked-link" : "is-open-link");
+      svg.appendChild(line);
+    }
   });
 }
 
@@ -7397,10 +7565,15 @@ function renderWrapReview(lesson) {
 
   const completeBtn = document.getElementById("complete-btn");
   completeBtn.disabled = false;
+  const undoLink = document.getElementById("undo-complete-link");
   if (isLessonComplete(lesson.id)) {
     completeBtn.textContent = "已完成 ✓"; completeBtn.disabled = true;
+    undoLink.style.display = "inline-block";
+    undoLink.onclick = () => handleUndoComplete(lesson.id);
   } else {
     completeBtn.textContent = "标记完成 · Mark as Complete";
+    undoLink.style.display = "none";
+    undoLink.onclick = null;
   }
 }
 
@@ -7410,6 +7583,30 @@ function handleComplete() {
   btn.textContent = "已保存 ✓ 正在返回首页..."; btn.disabled = true;
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   setTimeout(() => { showDashboard(); }, 900);
+}
+
+function handleUndoComplete(lessonId) {
+  const confirmed = confirm("确定要撤销这一课的完成状态吗？这会清除这一课已生成的复习卡片，且无法恢复。");
+  if (!confirmed) return;
+
+  undoLessonComplete(lessonId);
+  if (currentLesson && currentLesson.id === lessonId) {
+    renderWrapReview(currentLesson); // stamp/complete-btn/undo-link all flip back to "not complete"
+    showSection(0); // the wrap page no longer means anything for this lesson
+  }
+  showToast("已撤销");
+}
+
+/* ---------- Toast (simple, ephemeral text notification) ---------- */
+
+let toastHideTimer = null;
+function showToast(message) {
+  const toast = document.getElementById("app-toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add("is-visible");
+  clearTimeout(toastHideTimer);
+  toastHideTimer = setTimeout(() => toast.classList.remove("is-visible"), 1800);
 }
 
 /* ---------- Section navigation ---------- */
@@ -7449,8 +7646,19 @@ function showSection(index) {
 
   if (SECTION_ORDER[index] === "section-practice") updatePracticeGate();
   if (SECTION_ORDER[index] === "section-challenge") updateChallengeGate();
+  if (isLast) replayStampAnimation(document.querySelector("#section-wrap .completion-stamp"));
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* Restarts the .completion-stamp entrance animation — toggling the class alone
+   won't replay a CSS animation on an element that's staying in the DOM, so force
+   a reflow between removing and re-adding it. */
+function replayStampAnimation(stampEl) {
+  if (!stampEl) return;
+  stampEl.classList.remove("is-stamping");
+  void stampEl.offsetWidth;
+  stampEl.classList.add("is-stamping");
 }
 function goPrevSection() { if (currentSectionIndex > 0) showSection(currentSectionIndex - 1); }
 function goNextSection() { if (currentSectionIndex < SECTION_ORDER.length - 1) showSection(currentSectionIndex + 1); }
@@ -7946,7 +8154,7 @@ function renderReviewPanel() {
   if (reviewSession.idx >= reviewSession.queue.length) {
     panel.innerHTML = `
       <div class="completion-wrap">
-        <div class="completion-stamp">✓</div>
+        <div class="completion-stamp is-stamping">✓</div>
         <h2 class="completion-title">今日复习完成</h2>
       </div>`;
     reviewSession = null;
@@ -8369,19 +8577,35 @@ function computeAchievements() {
   return badges;
 }
 
+// In-memory only (not persisted) — tracks which badge names were unlocked as of
+// the previous renderAchievements() call, purely to detect "just unlocked this
+// visit" for the celebration effect. Resets on every page load, on purpose.
+let previousUnlockedBadges = new Set();
+
 function renderAchievements() {
   const container = document.getElementById("achievement-grid");
   container.innerHTML = "";
-  computeAchievements().forEach((b) => {
+  const badges = computeAchievements();
+  const nowUnlocked = new Set();
+
+  badges.forEach((b) => {
+    const isNew = b.unlocked && !previousUnlockedBadges.has(b.name);
+    if (b.unlocked) nowUnlocked.add(b.name);
+
     const el = document.createElement("div");
-    el.className = `achievement-badge ${b.unlocked ? "" : "is-locked"}`;
+    el.className = `achievement-badge ${b.unlocked ? "" : "is-locked"} ${isNew ? "is-newly-unlocked" : ""}`;
     el.innerHTML = `
       <div class="achievement-badge-icon">${b.icon}</div>
       <div class="achievement-badge-name">${b.name}</div>
       <div class="achievement-badge-progress">${b.progressText}</div>
     `;
+    if (isNew) {
+      el.addEventListener("animationend", () => el.classList.remove("is-newly-unlocked"), { once: true });
+    }
     container.appendChild(el);
   });
+
+  previousUnlockedBadges = nowUnlocked;
 }
 
 /* ---------- Screen entry/exit ---------- */
