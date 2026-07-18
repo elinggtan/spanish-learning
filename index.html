@@ -311,7 +311,30 @@ a { color: inherit; }
       </div>
     </div>
 
+    <div style="text-align:center; margin: -14px 0 22px;">
+      <button id="data-mgmt-link" style="font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); text-decoration: underline; padding: 6px;">⚙️ 数据管理（导出 / 导入学习数据）</button>
+    </div>
+
     <div id="module-path"></div>
+  </div>
+</div>
+
+<!-- ================= DATA MANAGEMENT PANEL (simple native overlay, reuses existing tokens) ================= -->
+<div id="data-mgmt-panel" style="display:none; position:fixed; inset:0; background:rgba(30,42,56,0.45); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div class="progress-card" style="max-width:420px; width:100%; margin-bottom:0;">
+    <div class="progress-card-top">
+      <div>
+        <span class="level-badge">⚙️ 数据管理</span>
+        <h1 class="progress-headline" style="font-size:20px;">导出 / 导入学习数据</h1>
+        <p class="progress-sub">备份或恢复你的进度、复习记录与自评状态</p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+      <button id="data-export-btn" class="nav-btn primary">⬇️ 导出学习数据</button>
+      <button id="data-import-btn" class="nav-btn ghost">⬆️ 导入学习数据</button>
+      <input type="file" id="data-import-file-input" accept="application/json" style="display:none;">
+      <button id="data-mgmt-close-btn" class="nav-btn ghost">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -5996,6 +6019,20 @@ if (typeof module !== "undefined") { module.exports = { LEVELS, LESSONS, getAllL
 const STORAGE_PROGRESS = "andale_progress_v2";
 const STORAGE_SPEAKING = "andale_speaking_selfcheck_v2";
 const STORAGE_CHALLENGE = "andale_challenge_state_v2";
+const STORAGE_LAST_POSITION = "andale_last_position_v1";
+
+/* ---------- Last-visited position (survives page refresh) ---------- */
+
+function saveLastPosition(pos) {
+  try { localStorage.setItem(STORAGE_LAST_POSITION, JSON.stringify(pos)); } catch (e) {}
+}
+function getLastPosition() {
+  try {
+    const raw = localStorage.getItem(STORAGE_LAST_POSITION);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
 
 /* ---------- Lesson completion progress ---------- */
 
@@ -6135,12 +6172,14 @@ function showDashboard() {
   document.getElementById("screen-dashboard").classList.add("is-active");
   window.scrollTo({ top: 0 });
   initDashboard();
+  saveLastPosition({ screen: "dashboard", lessonId: null, sectionIndex: null });
 }
 function showLessonScreen(lessonId) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("is-active"));
   document.getElementById("screen-lesson").classList.add("is-active");
   window.scrollTo({ top: 0 });
   initLessonPage(lessonId);
+  saveLastPosition({ screen: "lesson", lessonId, sectionIndex: 0 });
 }
 
 
@@ -7287,6 +7326,7 @@ function updateSectionDots() {
 
 function showSection(index) {
   currentSectionIndex = index;
+  if (currentLesson) saveLastPosition({ screen: "lesson", lessonId: currentLesson.id, sectionIndex: index });
   SECTION_ORDER.forEach((id, i) => document.getElementById(id).classList.toggle("is-active", i === index));
   document.getElementById("lesson-progress-fill").style.width = `${((index + 1) / SECTION_ORDER.length) * 100}%`;
   updateSectionDots();
@@ -7709,6 +7749,7 @@ function showReviewCenter() {
   document.getElementById("screen-review").classList.add("is-active");
   window.scrollTo({ top: 0 });
   initReviewCenter();
+  saveLastPosition({ screen: "review", lessonId: null, sectionIndex: null });
 }
 
 function initReviewCenter() {
@@ -7886,6 +7927,7 @@ function showGrammarRef() {
   document.getElementById("screen-grammar").classList.add("is-active");
   window.scrollTo({ top: 0 });
   initGrammarRef();
+  saveLastPosition({ screen: "grammar", lessonId: null, sectionIndex: null });
 }
 
 function initGrammarRef() {
@@ -7939,6 +7981,104 @@ function renderGrammarList() {
     container.appendChild(details);
   });
 }
+
+/* ============================================================
+   LAST POSITION — restore screen/lesson/section after a refresh
+   ============================================================ */
+
+function restoreLastPosition() {
+  const pos = getLastPosition();
+  if (!pos || pos.screen === "dashboard") return; // dashboard is already the default active screen
+
+  if (pos.screen === "lesson" && pos.lessonId && LESSONS[pos.lessonId]) {
+    showLessonScreen(pos.lessonId);
+    if (typeof pos.sectionIndex === "number" && pos.sectionIndex >= 0 && pos.sectionIndex < SECTION_ORDER.length) {
+      showSection(pos.sectionIndex);
+    }
+    return;
+  }
+  if (pos.screen === "review") { showReviewCenter(); return; }
+  if (pos.screen === "grammar") { showGrammarRef(); return; }
+  // Unknown/stale screen value or missing lesson (data changed) → fall back to dashboard, already active.
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  try { restoreLastPosition(); } catch (e) {}
+});
+
+/* ============================================================
+   DATA MANAGEMENT — export/import all learning data as JSON
+   ============================================================ */
+
+const BACKUP_STORAGE_KEYS = [
+  STORAGE_PROGRESS, STORAGE_SPEAKING, STORAGE_CHALLENGE,
+  STORAGE_REVIEW_STATE, STORAGE_REVIEW_STREAK, STORAGE_LAST_POSITION
+];
+
+function exportLearningData() {
+  const dump = {};
+  BACKUP_STORAGE_KEYS.forEach(key => {
+    const raw = localStorage.getItem(key);
+    if (raw !== null) dump[key] = raw;
+  });
+  const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `andale-backup-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importLearningDataFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(reader.result);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("bad shape");
+    } catch (e) {
+      alert("文件格式不正确");
+      return;
+    }
+    if (!confirm("这会覆盖当前的学习记录，确定要导入吗？")) return;
+    BACKUP_STORAGE_KEYS.forEach(key => {
+      if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+        try { localStorage.setItem(key, parsed[key]); } catch (e) {}
+      }
+    });
+    alert("导入成功，即将刷新页面");
+    window.location.reload();
+  };
+  reader.onerror = () => { alert("文件格式不正确"); };
+  reader.readAsText(file);
+}
+
+function initDataManagementPanel() {
+  const openBtn = document.getElementById("data-mgmt-link");
+  const panel = document.getElementById("data-mgmt-panel");
+  const closeBtn = document.getElementById("data-mgmt-close-btn");
+  const exportBtn = document.getElementById("data-export-btn");
+  const importBtn = document.getElementById("data-import-btn");
+  const fileInput = document.getElementById("data-import-file-input");
+  if (!openBtn || !panel) return;
+
+  openBtn.addEventListener("click", () => { panel.style.display = "flex"; });
+  closeBtn.addEventListener("click", () => { panel.style.display = "none"; });
+  panel.addEventListener("click", (e) => { if (e.target === panel) panel.style.display = "none"; });
+
+  exportBtn.addEventListener("click", exportLearningData);
+  importBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) importLearningDataFromFile(file);
+    fileInput.value = "";
+  });
+}
+document.addEventListener("DOMContentLoaded", initDataManagementPanel);
 
 /* ============================================================
    WRITING TASK — verification dump
